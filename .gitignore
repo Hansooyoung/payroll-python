@@ -1,0 +1,27 @@
+--- RAHASIA (WAJIB) ---
+
+.env
+.env.local
+*.key
+
+--- Python ---
+
+pycache/
+*.py[cod]
+*$py.class
+
+--- Database Lokal ---
+
+*.db
+*.sqlite3
+
+--- Virtual Environment ---
+
+venv/
+env/
+.venv/
+
+--- IDE Settings ---
+
+.vscode/
+.idea/
