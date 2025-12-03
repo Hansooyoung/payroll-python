@@ -222,8 +222,10 @@ def get_user_input_data(employee_name: str) -> Dict[str, float]:
     """Menangani interaksi input user."""
     print(f"\n--- Input Data Periode Ini ({employee_name}) ---")
     
+    # 1. Input Hari Hadir
     hari_hadir = get_input_number(f"Jumlah Hari Hadir (Maks {JUMLAH_HARI_KERJA_STANDAR}): ", 0, JUMLAH_HARI_KERJA_STANDAR)
     
+    # 2. Input Lembur
     ada_lembur = input("Apakah ada lembur bulan ini? (y/n): ").strip().lower()
     
     if ada_lembur == 'y':
@@ -342,15 +344,14 @@ def create_gaji():
             print("    Mohon cek menu 'Riwayat Gaji' atau 'Transfer Pending'.")
             return
 
-        # Fetch komponen master di luar loop (Optimasi)
         tunjangan_db = fetch_components(cur, "tunjangan", karyawan_id)
         potongan_db = fetch_components(cur, "potongan", karyawan_id)
 
         # ======================================================
-        #  LOOP VALIDASI INPUT (FITUR KONFIRMASI)
+        #  LOOP VALIDASI UTAMA
         # ======================================================
         while True:
-            # 1. Input
+            # 1. Input Data
             input_data = get_user_input_data(selected_emp['nama'])
             
             # 2. Hitung
@@ -359,14 +360,14 @@ def create_gaji():
             # 3. Preview
             preview_salary_slip(salary_data)
             
-            # 4. Konfirmasi
-            validasi = input("\n[?] Apakah data sudah benar? (Y/N): ").strip().upper()
+            # 4. Konfirmasi Final
+            validasi = input("\n[?] Apakah data sudah benar? (Y=Lanjut / N=Input Ulang): ").strip().upper()
             
             if validasi == 'Y':
-                break # Keluar loop, lanjut ke proses simpan
+                break 
             elif validasi == 'N':
                 print("\n[INFO] Mengulangi input data...\n")
-                continue # Ulangi loop dari awal
+                continue 
             else:
                 print("[!] Pilihan tidak valid.")
 
@@ -375,7 +376,7 @@ def create_gaji():
         # D. SIMPAN DATA (PENDING)
         print("\n[PROCESS] Menyimpan data gaji ke database...")
         gaji_id = save_salary_pending(conn, salary_data)
-        print(f"[SUCCESS] Data tersimpan! (ID Gaji: {gaji_id}, Status: PENDING)")
+        print(f"[SUCCESS] Data tersimpan! (ID Gaji: {gaji_id}, Status: SUCCESS)")
 
         # E. Cek Kelayakan Transfer
         comp_acc, emp_wallet = get_financial_data(cur, karyawan_id)
@@ -399,7 +400,7 @@ def create_gaji():
 
         # F. Konfirmasi Transfer
         print(f"\n[INFO] Saldo Perusahaan: {format_rupiah(comp_acc['saldo'])}")
-        confirm = input(f"👉 Transfer {format_rupiah(gaji_bersih)} sekarang? (Y/N): ").strip().upper()
+        confirm = input(f"Transfer {format_rupiah(gaji_bersih)} sekarang? (Y/N): ").strip().upper()
         
         if confirm == 'Y':
             execute_transfer(conn, salary_data, gaji_id, emp_wallet, comp_acc)
