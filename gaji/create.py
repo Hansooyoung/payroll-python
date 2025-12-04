@@ -13,9 +13,7 @@ from .payment_service import PaymentGateway
 JUMLAH_HARI_KERJA_STANDAR = 20  # 5 Hari kerja x 4 Minggu
 PEMBAGI_UPAH_SEJAM = 173        # Standar Kepmen 102/2004
 
-# ==========================================
 # 1. HELPER & UTILITIES
-# ==========================================
 
 def format_rupiah(nominal: float) -> str:
     """Mengubah angka float menjadi string format Rupiah."""
@@ -36,9 +34,7 @@ def get_input_number(prompt: str, min_val: float = 0, max_val: float = None) -> 
         except ValueError:
             print("[!] Input harus berupa angka!")
 
-# ==========================================
 # 2. DATABASE REPOSITORY PATTERN
-# ==========================================
 
 def fetch_employees(cur: sqlite3.Cursor) -> List[sqlite3.Row]:
     cur.execute("""
@@ -133,9 +129,7 @@ def update_salary_success(conn: sqlite3.Connection, gaji_id: int, trx_id: str, a
         print(f"[DB ERROR] Gagal update saldo: {e}")
         return False, 0
 
-# ==========================================
 # 3. BUSINESS LOGIC (CALCULATION)
-# ==========================================
 
 def calculate_nominal(tipe: str, nominal_default: float, gaji_pokok: float, hari_hadir: int) -> float:
     if tipe == 'tetap': return nominal_default
@@ -214,9 +208,7 @@ def calculate_payroll(karyawan: sqlite3.Row, input_data: Dict[str, float], tunja
         }
     }
 
-# ==========================================
 # 4. VIEW / PRESENTATION
-# ==========================================
 
 def get_user_input_data(employee_name: str) -> Dict[str, float]:
     """Menangani interaksi input user."""
@@ -261,9 +253,7 @@ def preview_salary_slip(data: Dict[str, Any]):
     print(f"GAJI BERSIH (THP)   : {format_rupiah(fin['gaji_bersih'])}")
     print("=" * 40)
 
-# ==========================================
 # 5. MAIN CONTROLLER
-# ==========================================
 
 def execute_transfer(conn: sqlite3.Connection, salary_data: Dict, gaji_id: int, emp_wallet: sqlite3.Row, comp_acc: sqlite3.Row):
     """Menangani proses transfer API, Update DB, dan Kirim Email."""
@@ -347,9 +337,7 @@ def create_gaji():
         tunjangan_db = fetch_components(cur, "tunjangan", karyawan_id)
         potongan_db = fetch_components(cur, "potongan", karyawan_id)
 
-        # ======================================================
         #  LOOP VALIDASI UTAMA
-        # ======================================================
         while True:
             # 1. Input Data
             input_data = get_user_input_data(selected_emp['nama'])
@@ -361,7 +349,7 @@ def create_gaji():
             preview_salary_slip(salary_data)
             
             # 4. Konfirmasi Final
-            validasi = input("\n[?] Apakah data sudah benar? (Y=Lanjut / N=Input Ulang): ").strip().upper()
+            validasi = input("\n[?] Apakah data sudah benar? (Y/N): ").strip().upper()
             
             if validasi == 'Y':
                 break 

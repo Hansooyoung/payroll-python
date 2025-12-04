@@ -2,9 +2,7 @@ import sqlite3
 import re
 from db import get_connection
 
-# ==========================================
-# 1. HELPER FUNCTIONS (Input Validator)
-# ==========================================
+# 1. HELPER FUNCTIONS 
 
 def get_valid_string(prompt: str, min_len: int = 1) -> str:
     """Meminta input string, memastikan tidak kosong/hanya spasi."""
@@ -51,9 +49,7 @@ def get_valid_currency(prompt: str) -> float:
         except ValueError:
             print("[!] Harap masukkan angka saja (tanpa Rp/Titik).")
 
-# ==========================================
 # 2. HELPER FUNCTIONS (Database Selector)
-# ==========================================
 
 def select_option_from_db(cur: sqlite3.Cursor, table: str, col_name: str, title: str) -> int:
     """Memilih ID dari tabel referensi (Jabatan/Status)."""
@@ -116,9 +112,7 @@ def select_bank_from_db(cur: sqlite3.Cursor) -> str:
         except ValueError:
             print("[!] Masukkan angka urutan.")
 
-# ==========================================
 # 3. FUNGSI UTAMA (Main Logic)
-# ==========================================
 
 def tambah_karyawan():
     conn = get_connection()
