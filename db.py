@@ -48,14 +48,16 @@ def setup_database():
     """)
 
     # --- 2. Karyawan & Wallet ---
+    # PERBAIKAN: Menghapus komentar '#' dari dalam string SQL
     cur.execute("""
     CREATE TABLE IF NOT EXISTS karyawan (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nama TEXT NOT NULL,
-        email TEXT,
+        email TEXT UNIQUE,
         jabatan_id INTEGER,
         status_pegawai_id INTEGER,
         gaji_pokok REAL DEFAULT 0,
+        is_active INTEGER DEFAULT 1,
         FOREIGN KEY (jabatan_id) REFERENCES jabatan(id),
         FOREIGN KEY (status_pegawai_id) REFERENCES status_pegawai(id)
     )

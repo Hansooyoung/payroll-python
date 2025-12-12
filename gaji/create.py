@@ -37,10 +37,15 @@ def get_input_number(prompt: str, min_val: float = 0, max_val: float = None) -> 
 # 2. DATABASE REPOSITORY PATTERN
 
 def fetch_employees(cur: sqlite3.Cursor) -> List[sqlite3.Row]:
+    """
+    Mengambil daftar karyawan yang berhak menerima gaji.
+    FILTER: Hanya karyawan AKTIF (is_active = 1).
+    """
     cur.execute("""
         SELECT k.id, k.nama, k.email, k.gaji_pokok, j.nama_jabatan, j.tunjangan_jabatan
         FROM karyawan k
         LEFT JOIN jabatan j ON k.jabatan_id = j.id
+        WHERE k.is_active = 1
     """)
     return cur.fetchall()
 
@@ -314,10 +319,10 @@ def create_gaji():
     try:
         employees = fetch_employees(cur)
         if not employees: 
-            print("[!] Data karyawan kosong.")
+            print("\n[!] Tidak ada karyawan AKTIF yang ditemukan.")
             return
 
-        print("\n=== FORMULIR PENGGAJIAN ===")
+        print("\n=== FORMULIR PENGGAJIAN (KARYAWAN AKTIF) ===")
         for k in employees: print(f"{k['id']}. {k['nama']} - {k['nama_jabatan']}")
 
         try:
@@ -325,7 +330,7 @@ def create_gaji():
             selected_emp = next((k for k in employees if k['id'] == karyawan_id), None)
             if not selected_emp: raise ValueError
         except (ValueError, StopIteration):
-            print("[!] ID Karyawan tidak ditemukan.")
+            print("[!] ID Karyawan tidak ditemukan atau Non-Aktif.")
             return
 
         if check_duplicate_payroll(cur, karyawan_id):

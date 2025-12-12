@@ -1,73 +1,105 @@
+# gaji/read.py
+import sqlite3
 from db import get_connection
+
+def format_rupiah(value):
+    """Format angka ke Rupiah (Rp1.000.000)"""
+    return f"Rp{value:,.0f}".replace(",", ".")
 
 def lihat_riwayat_gaji(page_size=10):
     conn = get_connection()
     cur = conn.cursor()
 
     print("\n=== FILTER RIWAYAT GAJI ===")
-    search = input("Cari riwayat berdasarkan Nama Karyawan atau ID (kosong = semua): ").strip()
+    search = input("Cari (Nama/ID) [Kosong = Semua]: ").strip()
 
-    # Query dasar untuk mendapatkan riwayat gaji beserta nama karyawan
+    # UPDATE QUERY: 
+    # 1. Ambil k.is_active (untuk tahu status karyawan)
+    # 2. Ambil g.status_transfer (untuk tahu status pembayaran)
     base_query = """
-        SELECT g.id, k.nama, g.periode, g.total_gaji
+        SELECT 
+            g.id, 
+            k.nama, 
+            k.is_active,
+            g.periode, 
+            g.total_gaji,
+            g.status_transfer
         FROM gaji g
         JOIN karyawan k ON g.karyawan_id = k.id
     """
+    
     params = ()
+    where_clauses = []
 
-    # Menambahkan kondisi WHERE berdasarkan input search
+    # Filter Search
     if search:
         if search.isdigit():
-            base_query += " WHERE k.id = ?"
+            where_clauses.append("k.id = ?")
             params = (int(search),)
         else:
-            base_query += " WHERE k.nama LIKE ?"
+            where_clauses.append("k.nama LIKE ?")
             params = (f"%{search}%",)
 
-    # Urutkan dari yang terbaru
-    base_query += " ORDER BY g.periode DESC"
-    
-    # Hitung total hasil
-    count_query = "SELECT COUNT(*) FROM (" + base_query + ")"
-    cur.execute(count_query, params)
-    total = cur.fetchone()[0]
+    # Gabungkan Where Clause
+    if where_clauses:
+        base_query += " WHERE " + " AND ".join(where_clauses)
 
-    if total == 0:
-        print("Riwayat gaji tidak ditemukan.")
+    # Urutkan: Periode Terbaru -> ID Terbesar
+    base_query += " ORDER BY g.periode DESC, g.id DESC"
+    
+    # Hitung Total Data
+    count_query = f"SELECT COUNT(*) FROM ({base_query})"
+    cur.execute(count_query, params)
+    total_records = cur.fetchone()[0]
+
+    if total_records == 0:
+        print("\n[INFO] Riwayat gaji tidak ditemukan.")
         conn.close()
         return
 
-    total_page = (total // page_size) + (1 if total % page_size else 0)
+    # Setup Paginasi
+    total_page = (total_records // page_size) + (1 if total_records % page_size else 0)
     current_page = 1
 
-    # --- Tampilan dengan Paginasi ---
+    # Konfigurasi Lebar Kolom
+    # ID(5) | Nama(25) | Periode(12) | Status(10) | Total(18)
+    header_fmt = f"{'ID':<5} {'Nama Karyawan':<25} {'Periode':<12} {'Status':<10} {'Total Gaji':>18}"
+    separator = "-" * len(header_fmt)
+
     while True:
         offset = (current_page - 1) * page_size
         query_paginate = base_query + " LIMIT ? OFFSET ?"
         cur.execute(query_paginate, params + (page_size, offset))
         data = cur.fetchall()
 
-        print(f"\n=== RIWAYAT GAJI KARYAWAN (Page {current_page}/{total_page}) ===")
-        
-        # Header Tabel
-        header = f"{'ID Slip':<8} {'Nama Karyawan':<25} {'Periode':<15} {'Total Gaji Bersih':>20}"
-        separator = "-" * len(header)
+        print(f"\n=== RIWAYAT GAJI (Page {current_page}/{total_page} | Total: {total_records}) ===")
         print(separator)
-        print(header)
+        print(header_fmt)
         print(separator)
 
         for row in data:
-            # Menggunakan f-string dengan padding yang benar
-            gaji_bersih_str = f"Rp{row[3]:,.0f}" 
+            gid, knama, kactive, periode, total, status = row
             
+            # Logic Tampilan Nama (Tambah [NA] jika non-aktif)
+            nama_display = knama
+            if kactive == 0:
+                nama_display += " [NA]"
+            
+            # Logic Tampilan Nama & Truncate jika kepanjangan
+            if len(nama_display) > 24:
+                nama_display = nama_display[:21] + "..."
+
+            # Formatting Baris
             print(
-                f"{row[0]:<8} "
-                f"{row[1]:<25} "
-                f"{row[2]:<15} "
-                f"{gaji_bersih_str:>20}" 
+                f"{gid:<5} "
+                f"{nama_display:<25} "
+                f"{periode:<12} "
+                f"{status:<10} "
+                f"{format_rupiah(total):>18}"
             )
         
         print(separator)
+        print("Ket: [NA] = Karyawan Non-Aktif/Resign")
 
         if total_page == 1:
             break
@@ -80,6 +112,6 @@ def lihat_riwayat_gaji(page_size=10):
         elif action == "e":
             break
         else:
-            print("Pilihan tidak valid atau halaman tidak tersedia.")
+            print("[!] Pilihan tidak valid.")
 
     conn.close()

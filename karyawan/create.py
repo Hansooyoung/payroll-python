@@ -16,7 +16,7 @@ def get_valid_email(cur: sqlite3.Cursor) -> str:
     """
     Meminta input email dengan validasi:
     1. Format Regex (nama@domain.com)
-    2. Cek Duplikasi di Database (Uniqueness)
+    2. Cek Duplikasi di Database (Hanya cek karyawan yang AKTIF)
     """
     email_regex = r"^[\w\.-]+@[\w\.-]+\.\w+$"
     
@@ -31,12 +31,20 @@ def get_valid_email(cur: sqlite3.Cursor) -> str:
             continue
             
         # Cek Duplikasi
-        cur.execute("SELECT id FROM karyawan WHERE email = ?", (email,))
-        if cur.fetchone():
-            print(f"[!] Email '{email}' sudah digunakan karyawan lain.")
+        cur.execute("SELECT id, nama FROM karyawan WHERE email = ? AND is_active = 1", (email,))
+        existing = cur.fetchone()
+        
+        if existing:
+            print(f"[!] Email '{email}' sedang digunakan oleh karyawan aktif: {existing[1]}.")
         else:
+            cur.execute("SELECT id, nama FROM karyawan WHERE email = ? AND is_active = 0", (email,))
+            archived = cur.fetchone()
+            if archived:
+                print(f"[INFO] Email ini milik mantan karyawan '{archived[1]}' (Non-Aktif).")
+                print("Tips: Gunakan menu UPDATE untuk mengaktifkan kembali ID tersebut.")
+                return email 
+            
             return email
-
 def get_valid_currency(prompt: str) -> float:
     """Meminta input angka positif (uang)."""
     while True:

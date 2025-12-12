@@ -18,7 +18,7 @@ def _display_karyawan_list(query, params, page_size=10):
     """
     Menampilkan tabel karyawan dengan data lengkap termasuk Wallet/Bank.
     Ekspektasi urutan kolom Query: 
-    [0]ID, [1]Nama, [2]Jabatan, [3]Status, [4]Gaji, [5]Email, [6]Bank, [7]NoRek
+    [0]ID, [1]Nama, [2]Jabatan, [3]StatusPegawai, [4]Gaji, [5]Email, [6]Bank, [7]NoRek, [8]IsActive
     """
     conn = get_connection()
     cur = conn.cursor()
@@ -37,13 +37,12 @@ def _display_karyawan_list(query, params, page_size=10):
     total_page = (total_records // page_size) + (1 if total_records % page_size else 0)
     current_page = 1
 
-    # 3. Konfigurasi Lebar Kolom (Total sktr 110 char)
+    # 3. Konfigurasi Lebar Kolom
     W = {
-        'ID': 4, 'Nama': 20, 'Jabatan': 12, 'Status': 10, 
+        'ID': 4, 'Nama': 20, 'Jabatan': 12, 'Status': 14, # Lebarkan dikit buat label non-aktif
         'Gaji': 14, 'Bank': 8, 'Rekening': 16
     }
     
-    # Header Format
     header_fmt = (
         f"{'ID':<{W['ID']}} | {'NAMA':<{W['Nama']}} | {'JABATAN':<{W['Jabatan']}} | "
         f"{'STATUS':<{W['Status']}} | {'BANK':<{W['Bank']}} | {'NO. REKENING':<{W['Rekening']}} | "
@@ -64,20 +63,24 @@ def _display_karyawan_list(query, params, page_size=10):
         print(separator)
 
         for row in rows:
-            # Unpacking data agar mudah dibaca
-            # Asumsi query select urutannya sesuai
-            k_id, nama, jab, stat, gaji, email, bank, rek = row
+            # Unpacking data (Pastikan query SELECT-nya sesuai urutan)
+            k_id, nama, jab, stat_peg, gaji, email, bank, rek, is_active = row
 
-            # Handling data kosong (None)
+            # Logic Tampilan Status
+            if is_active == 0:
+                # Jika non-aktif, tambahkan label visual
+                status_display = f"[NA] {stat_peg}" 
+            else:
+                status_display = stat_peg
+
             bank_str = bank if bank else "-"
             rek_str  = rek if rek else "-"
             
-            # Print Baris
             print(
                 f"{str(k_id):<{W['ID']}} | "
                 f"{truncate_string(nama, W['Nama']):<{W['Nama']}} | "
                 f"{truncate_string(jab, W['Jabatan']):<{W['Jabatan']}} | "
-                f"{truncate_string(stat, W['Status']):<{W['Status']}} | "
+                f"{truncate_string(status_display, W['Status']):<{W['Status']}} | "
                 f"{bank_str:<{W['Bank']}} | "
                 f"{rek_str:<{W['Rekening']}} | "
                 f"{format_rupiah(gaji):>{W['Gaji']}}"
@@ -103,18 +106,18 @@ def filter_karyawan(page_size=10):
     cur = conn.cursor()
 
     print("\n=== LIHAT DATA KARYAWAN ===")
-    print("1. Semua Data")
-    print("2. Cari Nama / ID")
-    print("3. Filter per Jabatan")
+    print("1. Karyawan Aktif (Default)")
+    print("2. Semua Data (Termasuk Non-Aktif)")
+    print("3. Cari Nama / ID")
+    print("4. Filter per Jabatan")
     
-    pilih = input("Pilih (1-3): ").strip()
+    pilih = input("Pilih (1-4): ").strip()
 
-    # Query Utama: JOIN ke Wallet juga
-    # Mengambil Wallet Utama (is_primary=1)
+    # Query Utama: Tambahkan kolom k.is_active di akhir select
     base_query = """
         SELECT 
             k.id, k.nama, j.nama_jabatan, s.nama_status, k.gaji_pokok, k.email,
-            w.kode_bank, w.nomor_rekening
+            w.kode_bank, w.nomor_rekening, k.is_active
         FROM karyawan k
         LEFT JOIN jabatan j ON k.jabatan_id = j.id
         LEFT JOIN status_pegawai s ON k.status_pegawai_id = s.id
@@ -124,7 +127,13 @@ def filter_karyawan(page_size=10):
     where_clause = ""
     params = ()
 
-    if pilih == "2":
+    if pilih == "1": # Default: Hanya Aktif
+        where_clause = " WHERE k.is_active = 1"
+
+    elif pilih == "2": # Semua Data
+        where_clause = "" # Tidak ada filter, tampil semua
+
+    elif pilih == "3": # Cari (Bisa cari yg non-aktif juga)
         search = input("Masukkan Nama atau ID: ").strip()
         if search.isdigit():
             where_clause = " WHERE k.id = ?"
@@ -133,23 +142,21 @@ def filter_karyawan(page_size=10):
             where_clause = " WHERE k.nama LIKE ?"
             params = (f"%{search}%",)
             
-    elif pilih == "3":
-        # Dropdown Jabatan Simple
+    elif pilih == "4": # Filter Jabatan (Hanya yg aktif saja biar rapi)
         cur.execute("SELECT id, nama_jabatan FROM jabatan")
         jabs = cur.fetchall()
         for j in jabs: print(f"{j[0]}. {j[1]}")
         
         try:
             jid = int(input("Pilih ID Jabatan: "))
-            where_clause = " WHERE k.jabatan_id = ?"
+            where_clause = " WHERE k.jabatan_id = ? AND k.is_active = 1"
             params = (jid,)
         except:
             print("[!] Input error.")
             conn.close(); return
 
-    conn.close() # Close koneksi sementara ini, karena _display buka koneksi sendiri
+    conn.close() 
     
-    # Panggil Helper Display
     final_query = base_query + where_clause
     _display_karyawan_list(final_query, params, page_size)
 
@@ -162,8 +169,8 @@ def lihat_tunjangan_potongan():
     keyword = input("\nCari Karyawan (Nama/ID): ").strip()
     if not keyword: return
 
-    # Cari ID karyawan dulu
-    query_search = "SELECT id, nama, email FROM karyawan WHERE "
+    # Tambahkan is_active di select
+    query_search = "SELECT id, nama, email, is_active FROM karyawan WHERE "
     if keyword.isdigit():
         query_search += "id = ?"
         params = (int(keyword),)
@@ -178,12 +185,14 @@ def lihat_tunjangan_potongan():
         print("[!] Karyawan tidak ditemukan.")
         conn.close(); return
 
-    # Loop hasil pencarian (biasanya cuma 1 kalau pakai ID)
     for k in karyawan_list:
-        kid, knama, kemail = k
+        kid, knama, kemail, kactive = k
         
+        # Label Status di Detail View
+        status_label = "" if kactive == 1 else " [NON-AKTIF / RESIGN]"
+
         print("\n" + "="*50)
-        print(f"DETAIL KARYAWAN: {knama.upper()} (ID: {kid})")
+        print(f"DETAIL KARYAWAN: {knama.upper()} (ID: {kid}){status_label}")
         print("="*50)
         print(f"Email: {kemail}")
 

@@ -5,6 +5,26 @@ def assign_potongan(karyawan_id):
     conn = get_connection()
     cur = conn.cursor()
 
+    # --- 0. VALIDASI STATUS KARYAWAN (NEW LOGIC) ---
+    # Kita harus cek dulu, jangan sampai assign potongan ke karyawan yang sudah resign/dihapus
+    cur.execute("SELECT nama, is_active FROM karyawan WHERE id = ?", (karyawan_id,))
+    karyawan = cur.fetchone()
+
+    if not karyawan:
+        print(f"[!] Karyawan ID {karyawan_id} tidak ditemukan.")
+        conn.close()
+        return
+
+    nama_karyawan = karyawan[0]
+    is_active = karyawan[1]
+
+    if is_active == 0:
+        print(f"\n⚠️  GAGAL: Karyawan '{nama_karyawan}' berstatus NON-AKTIF.")
+        print("Anda tidak dapat menetapkan potongan baru untuk karyawan yang sudah dinonaktifkan.")
+        conn.close()
+        return
+    # ------------------------------------------------
+
     # --- 1. Ambil Potongan yang BELUM Dimiliki Karyawan (Anti-Duplicate View) ---
     cur.execute("""
         SELECT p.id, p.nama_potongan, p.nominal_default, p.tipe
@@ -17,12 +37,12 @@ def assign_potongan(karyawan_id):
     potongan_data_tersedia = cur.fetchall()
     
     if not potongan_data_tersedia:
-        print(f"\nKaryawan ID {karyawan_id} SUDAH memiliki semua jenis potongan master yang ada.")
+        print(f"\nKaryawan '{nama_karyawan}' SUDAH memiliki semua jenis potongan master yang ada.")
         conn.close()
         return
 
     # --- 2. Tampilkan Daftar Potongan yang Tersedia untuk Ditetapkan ---
-    print(f"\n=== POTONGAN TERSEDIA UNTUK KARYAWAN ID {karyawan_id} ===")
+    print(f"\n=== POTONGAN TERSEDIA UNTUK: {nama_karyawan.upper()} ===")
     p_header = f"{'ID':<4} {'Nama Potongan':<25} {'Nominal Default':>18} {'Tipe':<10}"
     separator = "-" * len(p_header)
     print(separator)
@@ -47,19 +67,18 @@ def assign_potongan(karyawan_id):
                 break
             
             if potongan_id in potongan_ids_tersedia:
-                # TIDAK PERLU Cek COUNT(*) lagi, karena query awal sudah menjamin ID belum ada
                 cur.execute("""
                     INSERT INTO karyawan_potongan (karyawan_id, potongan_id)
                     VALUES (?, ?)
                 """, (karyawan_id, potongan_id))
                 conn.commit()
-                print(f"Potongan ID {potongan_id} berhasil ditetapkan! ✅")
+                print(f"✅ Potongan ID {potongan_id} berhasil ditetapkan!")
                 
-                # Hapus dari daftar tersedia agar tidak bisa diinput ulang tanpa restart fungsi
+                # Hapus dari daftar tersedia agar tidak bisa diinput ulang
                 potongan_ids_tersedia.remove(potongan_id) 
             else:
-                print("ID tidak valid, sudah dimiliki, atau tidak ditemukan.")
+                print("[!] ID tidak valid, sudah dimiliki, atau tidak ditemukan.")
         except ValueError:
-            print("Input harus angka.")
+            print("[!] Input harus angka.")
 
     conn.close()
